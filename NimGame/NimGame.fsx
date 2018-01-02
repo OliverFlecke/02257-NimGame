@@ -49,14 +49,32 @@ let window = new Form(Text="Nim Game", Size=Size(500,500))
 
 let createHeap n : Heaps = List.init n (fun _ -> rnd.Next(1, 20))
 
+
+
 let removeMatches index count heaps : Either<Heaps, String> = 
-    if count < 1 
-        then Error "Invalid count"
-        else
-            let newHeaps = List.toArray heaps
-            Array.set newHeaps index (max 0 (heaps.[index] - (max 0 count)))
-            Succes (Array.toList newHeaps)
+    if index < 1 || index > List.length heaps
+        then Error "Index out of bounds"
+        else if count < 1
+            then Error "Invalid count"
+            else
+                let newHeaps = List.toArray heaps
+                Array.set newHeaps (index - 1) (max 0 (heaps.[index - 1] - (max 0 count)))
+                Succes (Array.toList newHeaps)
     
+let maxIndex seq = 
+    seq 
+    |> Seq.mapi (fun i x -> i, x) 
+    |> Seq.maxBy snd 
+    |> fst 
+let aiAction (heaps: Heaps) = 
+    let m = Seq.reduce (^^^) heaps 
+    let (index, count) = 
+        match m with 
+            | 0 -> (maxIndex heaps, 1) 
+            | _ -> let k = Seq.findIndex (fun a -> (m ^^^ a) < a) heaps 
+                   (k, heaps.[k] - (m ^^^ heaps.[k])) 
+    removeMatches (index + 1) count heaps
+
 let gameOver = List.forall ((=) 0)
 
 let swapPlayer = function 
@@ -65,10 +83,11 @@ let swapPlayer = function
 
 let heapsToString heaps = String.concat "   " (List.map string heaps) 
 
-let rec pendingPlayer heaps player error = 
+
+let rec pendingPlayer heaps error = 
     async {
         window.Controls.Clear ()
-        let playerLabel = new Label(Location=Point(20, 20), Text=((string player) + "'s turn"))
+        let playerLabel = new Label(Location=Point(20, 20), Text="Player1's turn")
         window.Controls.Add playerLabel
 
         // Heaps view
@@ -103,10 +122,18 @@ let rec pendingPlayer heaps player error =
                 match removeMatches index count heaps with 
                     | Succes newHeaps   -> 
                         if gameOver newHeaps 
-                            then return! finished player
-                            else return! pendingPlayer newHeaps (swapPlayer player) None
-                    | Error errorMsg    -> return! pendingPlayer heaps player error                 
+                            then return! finished Player1
+                            else return! pendingPlayerAI newHeaps None
+                    | Error errorMsg    -> return! pendingPlayer heaps (Some errorMsg)                 
             | _                     -> failwith "PendingPlayer Error:"
+    }
+and pendingPlayerAI heaps error = 
+    async {
+        match aiAction heaps with 
+            | Succes newHeaps       -> if gameOver newHeaps 
+                                        then return! finished Player2
+                                        else return! pendingPlayer newHeaps None
+            | Error errorMessage    -> failwith "End of the world"
     }
 and start () = 
     async {
@@ -120,7 +147,7 @@ and start () =
 
         let! msg = ev.Receive ()
         match msg with
-            | Start     -> return! pendingPlayer (createHeap (int numberOfHeapsBox.Text)) Player1 None
+            | Start     -> return! pendingPlayer (createHeap (int numberOfHeapsBox.Text)) None
             | _         -> failwith "Start: unexpected message"
     }
 and finished player = 
