@@ -4,7 +4,6 @@ open System.Threading
 open System.Windows.Forms
 open System.Drawing
 open System.Collections
-open System
 
 type Heaps = int list
 type HeapIndex = int
@@ -13,7 +12,6 @@ type Player = Player1 | Player2
 
 type Message =
     | Start of int
-    | Error
     | Reset
     | Action of HeapIndex * HeapCount
 
@@ -21,17 +19,18 @@ type Either<'a, 'b> =
     | Left of 'a
     | Right of 'b
 type Error = string
+type View =
+    | InitialView
+    | PendingPlayerView
+    | AiView
+    | FinishedView
 type State =
-    | StartState
-    | PendingPlayerState
-    | AiState
-    | FinishedState
-type Data =
     {
         Heaps: Heaps
         Error: Error option
         Player: Player
         AiMode: bool
+        View: View
     }
 
 
@@ -65,7 +64,7 @@ let createHeap n : Heaps = List.init n (fun _ -> rnd.Next(1, 20))
 let removeMatches index count heaps : Either<Error, Heaps> =
     if index < 0 || index > (List.length heaps) - 1
         then Left "Index out of bounds"
-        else if count < 1
+        else if count < 1 || heaps.[index] = 0
             then Left "Invalid count"
             else
                 let newHeaps = List.toArray heaps
@@ -98,13 +97,13 @@ let heapsToString heaps = String.concat "   " (List.map string heaps)
 // Nim Game GUI
 let window = new Form(Text="Nim Game", Size=Size(500,500))
 
-let pendingPlayerGUI data =
+let pendingPlayerGUI state =
     window.Controls.Clear ()
-    let playerLabel = new Label(Location=Point(20, 20), Text=((string data.Player) + "'s turn"))
+    let playerLabel = new Label(Location=Point(20, 20), Text=((string state.Player) + "'s turn"))
     window.Controls.Add playerLabel
 
     // Heaps view
-    let heapLabel = new Label(Location=Point(20, 50), Text=heapsToString data.Heaps, MinimumSize=Size(500, 20))
+    let heapLabel = new Label(Location=Point(20, 50), Text=heapsToString state.Heaps, MinimumSize=Size(500, 20))
     window.Controls.Add heapLabel
 
     // Input boxes
@@ -119,7 +118,7 @@ let pendingPlayerGUI data =
     window.Controls.Add countBox
 
     // Error handling
-    match data.Error with
+    match state.Error with
         | Some errorMessage ->
             let errorLabel = new Label(Location=Point(20, 200), Text=errorMessage)
             window.Controls.Add errorLabel
@@ -141,99 +140,92 @@ let startGUI () =
     window.Controls.Add startButton
     startButton.Click.Add (fun _ -> ev.Post (Start (int numberOfHeapsBox.Text)))
 
-let finishedGUI data =
+let finishedGUI state =
     window.Controls.Clear ()
-    let winnerLabel = new Label(Location=Point(20, 20), Text=((string data.Player) + " is the winner!"), MinimumSize=Size(300,20))
+    let winnerLabel = new Label(Location=Point(20, 20), Text=((string state.Player) + " is the winner!"), MinimumSize=Size(300,20))
     window.Controls.Add winnerLabel
 
     let resetButton = new Button(Location=Point(20, 50), Text="Reset")
     window.Controls.Add resetButton
     resetButton.Click.Add (fun _ -> ev.Post Reset)
 
-let nimGameGUI state data =
-    match state with
-        | StartState            -> startGUI ()
-        | PendingPlayerState    -> pendingPlayerGUI data
-        | AiState               -> ()
-        | FinishedState         -> finishedGUI data
+let nimGameGUI state =
+    match state.View with
+        | InitialView                   -> startGUI ()
+        | PendingPlayerView | AiView    -> pendingPlayerGUI state
+        | FinishedView                  -> finishedGUI state
 
 // Command line interface for the game
-let printGameState data =
-    match data.Error with
+let printGameState state =
+    match state.Error with
         | Some errorMsg -> Console.WriteLine errorMsg
         | None                  -> ()
     Console.WriteLine ""
-    Console.WriteLine (string data.Player + "'s turn.")
-    Console.WriteLine ("Heaps: " + heapsToString data.Heaps)
+    Console.WriteLine (string state.Player + "'s turn.")
+    Console.WriteLine ("Heaps: " + heapsToString state.Heaps)
 
-let nimGameCommandLineInterface state data =
-    match state with
-        | StartState            ->
+let nimGameCommandLineInterface state =
+    match state.View with
+        | InitialView            ->
             Console.WriteLine "Welcome to Nim!"
             Console.WriteLine "Enter the number of heaps you want to play: "
             let numberOfHeaps = int (Console.ReadLine ())
             ev.Post (Start numberOfHeaps)
-        | PendingPlayerState   ->
-            printGameState data
+        | PendingPlayerView    ->
+            printGameState state
             Console.WriteLine "Choose a heap index... "
             let index = int (Console.ReadLine ())
             Console.WriteLine "And the number of matches to remove..."
             let count = int (Console.ReadLine ())
             ev.Post (Action (index - 1, count))
-        | AiState              ->
-            printGameState data
+        | AiView               ->
+            printGameState state
             let (index, count) =
                 match List.head (ev.History ()) with
                     | Action (index, count) -> (index + 1, count)
                     | _                     -> failwith "History is corrupt!"
             Console.WriteLine (string (index, count))
-        | FinishedState         ->
-            Console.WriteLine ("Game Over! The winner is " + string data.Player)
+        | FinishedView         ->
+            Console.WriteLine ("Game Over! The winner is " + string state.Player)
             Console.WriteLine "Want to play again? y/n"
             let response = Console.ReadLine ()
             if response = "y"
-                then ev.Post Reset
+                then Console.WriteLine ""; ev.Post Reset
                 else Environment.Exit 0
 
-// State atomata
-let rec start (ui : State -> Data -> unit) =
-    async {
-        ui StartState { Heaps = List.empty; Error = None; Player = Player1; AiMode = true }
-        let! msg = ev.Receive ()
-        match msg with
-            | Start numberOfHeaps   ->
-                return! pendingPlayer ui { Heaps = (createHeap numberOfHeaps); Error = None; Player = Player1; AiMode = false }
-            | _                     -> failwith "Start error: unknown"
-    }
-and pendingPlayer ui data =
-    async {
-        match data.Player with
-            | Player1 -> ui PendingPlayerState data
-            | Player2 ->
-                if data.AiMode
-                    then aiAction data.Heaps; ui AiState data
-                    else ui PendingPlayerState data
-        let! msg = ev.Receive ()
-        match msg with
-            | Action (index, count) ->
-                match removeMatches index count data.Heaps with
-                    | Right newHeaps            ->
-                        if gameOver newHeaps
-                            then return! finished ui {data with Heaps = newHeaps; Error = None }
-                            else return! pendingPlayer ui
-                                    { data with Heaps = newHeaps; Error = None; Player = swapPlayer data.Player }
-                    | Left errorMessage         -> return! pendingPlayer ui { data with Error = (Some errorMessage) }
-            | _                     -> failwith "PendingPlayerAI error: unknown"
-    }
-and finished ui data =
-    async {
-        ui FinishedState data
-        let! msg = ev.Receive ()
-        match msg with
-            | Reset -> return! start ui
-            | _     -> failwith "Finished error: unknown"
-    }
+let initialState = { Heaps = List.empty; Error = None; Player = Player1; AiMode = false; View = InitialView }
+let reducer state message : State =
+    match message with
+        | Start count           -> { initialState with Heaps = createHeap count; View = PendingPlayerView }
+        | Action (index, count) ->
+            match removeMatches index count state.Heaps with
+                | Left errorMessage -> { state with Error = Some errorMessage }
+                | Right heaps'      ->
+                    let state' = { state with Heaps = heaps'; Error = None }
+                    if gameOver state'.Heaps
+                        then { state' with View = FinishedView }
+                        else { state' with Player = swapPlayer state'.Player; View = PendingPlayerView }
+        | Reset                 -> initialState
 
-// Async.StartImmediate (start nimGameGUI)
-// Application.Run(window)
-Async.StartImmediate (start nimGameCommandLineInterface)
+let middleware reducer state message =
+    let state' = reducer state message
+    if state'.AiMode && state'.Player = Player2 && state'.View = PendingPlayerView
+        then aiAction state'.Heaps; { state' with View = AiView }
+        else state'
+
+// State atomata
+let start (ui : State -> unit) =
+    ui initialState
+    let rec run state =
+        async {
+            let! msg = ev.Receive ()
+            let newState = middleware reducer state msg
+            ui newState
+            return! run newState
+        }
+    run initialState
+
+Async.StartImmediate (start nimGameGUI)
+Application.Run(window)
+
+// Async.StartImmediate (start nimGameUISetup)
