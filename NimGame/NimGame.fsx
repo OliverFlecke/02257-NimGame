@@ -10,9 +10,9 @@ open NimGameGUI
 open System.Windows.Forms
 
 // [<EntryPoint>]
-let main args = 
-    // Async.StartImmediate (start nimGameCommandLineUI)
+let main args =
     0
 
+// Async.StartImmediate (start nimGameCommandLineUI)
 Async.StartImmediate (start nimGameGUI)
 Application.Run(window)
