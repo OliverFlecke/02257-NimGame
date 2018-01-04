@@ -7,20 +7,24 @@ open Heaps
 open StateStore
 open AsyncEventQueue
 open System.Drawing
+open System.Drawing
 
-let window = new Form(Text="Nim Game",
+let window = new Form(Text="Nim the Game",
                         Size=Size(300, 400),
                         BackColor=Color.LightGray)
 
 let startGUI state =
     window.Controls.Clear ()
-
+    let titleLabel = new Label(Location=Point(20, 20),
+                               Font=new Font(FontFamily.GenericSansSerif, 16.0f),
+                               Text="Nim")
+    window.Controls.Add titleLabel
     // Input for the number of heaps
-    let numberOfHeapsLabel = new Label(Location=Point(20, 20),
+    let numberOfHeapsLabel = new Label(Location=Point(20, 50),
                                        Text="Enter the number of heaps to play:",
                                        MinimumSize=Size(300, 20))
     window.Controls.Add numberOfHeapsLabel
-    let numberOfHeapsInput = new NumericUpDown(Location=Point(20, 40),
+    let numberOfHeapsInput = new NumericUpDown(Location=Point(20, 70),
                                                MinimumSize=Size(240, 20),
                                                Minimum=1m,
                                                Maximum=10m,
@@ -28,18 +32,18 @@ let startGUI state =
     window.Controls.Add numberOfHeapsInput
 
     // Enable/disable Ai
-    let aiEnabledCheckBox = new CheckBox(Location=Point(20, 80),
+    let aiEnabledCheckBox = new CheckBox(Location=Point(20, 110),
                                          MinimumSize=Size(100, 20),
                                          Text="AI Enabled",
                                          Checked=state.Settings.AIEnabled)
     window.Controls.Add aiEnabledCheckBox
 
     // Control the difficulty of the AI
-    let aiDifficultyLabel = new Label(Location=Point(20, 110),
+    let aiDifficultyLabel = new Label(Location=Point(20, 150),
                                       MinimumSize=Size(240, 20),
                                       Text="Ai Difficulty")
     window.Controls.Add aiDifficultyLabel
-    let aiDifficultyTrackBar = new TrackBar(Location=Point(20, 130),
+    let aiDifficultyTrackBar = new TrackBar(Location=Point(20, 170),
                                             MinimumSize=Size(240, 20),
                                             Value=(int (state.Settings.AIDifficulty * 10.0)),
                                             Enabled=state.Settings.AIEnabled)
@@ -54,7 +58,7 @@ let startGUI state =
         events.Post (ChangeSettings { AIEnabled = aiEnabledCheckBox.Checked;
                                       AIDifficulty = (float aiDifficultyTrackBar.Value) / 10.0 }) )
     // Start game button
-    let startButton = new Button(Location=Point(20, 200),
+    let startButton = new Button(Location=Point(20, 230),
                                     Size=Size(240,30),
                                     Text="Start")
     window.Controls.Add startButton
@@ -140,7 +144,9 @@ let finishedGUI state =
                                 MinimumSize=Size(300,20))
     window.Controls.Add winnerLabel
 
-    let resetButton = new Button(Location=Point(20, 50), Text="Reset")
+    let resetButton = new Button(Location=Point(20, 50), 
+                                 Text="Reset",
+                                 Size=Size(240, 30))
     window.Controls.Add resetButton
     resetButton.Click.Add (fun _ -> events.Post Reset)
 

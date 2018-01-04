@@ -113,16 +113,15 @@ let update state message : State =
                 | Left errorMessage -> { state with Error = Some errorMessage }
                 | Right heaps'      ->
                     let state' = { state with Heaps = heaps';
-                                                      Error = None;
-                                                      PreviousState = Some state;
-                                                      LastChoice = Some (index, count) }
+                                              Error = None;
+                                              PreviousState = Some state;
+                                              LastChoice = Some (index, count) }
                     if gameOver state'.Heaps
                         then { state' with View = FinishedView; }
                         else { state' with Player = swapPlayer state'.Player;
                                            View = PendingPlayerView; }
 
 let middleware update state message =
-
     let state' = update state message
     if state'.Settings.AIEnabled && state'.Player = Player2 && state'.View = PendingPlayerView
         then aiAction state'; { state' with View = AiView }
