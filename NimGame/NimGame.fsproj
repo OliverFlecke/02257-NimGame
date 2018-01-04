@@ -1,13 +1,21 @@
-<?xml version="1.0" encoding="utf-8"?>
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <ProjectGuid>a991687e-5ea8-435d-b121-cdf995dc9a42</ProjectGuid>
     <OutputType>Exe</OutputType>
     <TargetFramework>net461</TargetFramework>
-    <DebugType>portable</DebugType>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="Heaps.fs" />
+    <Compile Include="AsyncEventQueue.fs" />
+    <Compile Include="StateStore.fs" />
+    <Compile Include="NimGameCmdUI.fs" />
+    <Compile Include="NimGameGUI.fs" />
     <Compile Include="NimGame.fs" />
     <None Include="App.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="FSharp.Core" />
+    <Reference Include="System.Windows.Forms" />
   </ItemGroup>
   <Import Project="..\.paket\Paket.Restore.targets" />
 </Project>
