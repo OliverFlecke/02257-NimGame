@@ -7,13 +7,12 @@ open Heaps
 open StateStore
 open AsyncEventQueue
 open System.Drawing
-open System.Drawing
 
 let window = new Form(Text="Nim the Game",
                         Size=Size(300, 400),
                         BackColor=Color.LightGray)
 
-let startGUI state =
+let startGUI state dispatch =
     window.Controls.Clear ()
     let titleLabel = new Label(Location=Point(20, 20),
                                Font=new Font(FontFamily.GenericSansSerif, 16.0f),
@@ -52,19 +51,19 @@ let startGUI state =
 
     // Event handlers
     aiEnabledCheckBox.Click.Add (fun _ ->
-        events.Post (ChangeSettings { AIEnabled = aiEnabledCheckBox.Checked;
+        dispatch (ChangeSettings { AIEnabled = aiEnabledCheckBox.Checked;
                                       AIDifficulty = (float aiDifficultyTrackBar.Value) / 10.0 }))
     aiDifficultyTrackBar.Click.Add (fun _ ->
-        events.Post (ChangeSettings { AIEnabled = aiEnabledCheckBox.Checked;
+        dispatch (ChangeSettings { AIEnabled = aiEnabledCheckBox.Checked;
                                       AIDifficulty = (float aiDifficultyTrackBar.Value) / 10.0 }) )
     // Start game button
     let startButton = new Button(Location=Point(20, 230),
                                     Size=Size(240,30),
                                     Text="Start")
     window.Controls.Add startButton
-    startButton.Click.Add (fun _ -> events.Post (Start (int numberOfHeapsInput.Value)))
+    startButton.Click.Add (fun _ -> dispatch (Start (int numberOfHeapsInput.Value)))
 
-let pendingPlayerGUI state =
+let pendingPlayerGUI state dispatch =
     window.Controls.Clear ()
     let playerLabel = new Label(Location=Point(20, 20),
                                 Size=Size(260, 30),
@@ -103,7 +102,7 @@ let pendingPlayerGUI state =
     let submitButton = new Button(Location=Point(20, 150),
                                   Text="Submit",
                                   Size=Size(240, 30))
-    submitButton.Click.Add (fun _ -> events.Post (Action ((int indexInput.Value) - 1, (int countInput.Value))))
+    submitButton.Click.Add (fun _ -> dispatch (Action ((int indexInput.Value) - 1, (int countInput.Value))))
     window.Controls.Add submitButton
 
     // Undo button
@@ -111,14 +110,14 @@ let pendingPlayerGUI state =
                                 Text="Undo",
                                 Size=Size(240, 30),
                                 Enabled=(state.PreviousState.IsSome))
-    undoButton.Click.Add (fun _ -> events.Post Undo)
+    undoButton.Click.Add (fun _ -> dispatch Undo)
     window.Controls.Add undoButton
 
     // Reset button
     let resetButton = new Button(Location=Point(20, 230),
                                  Text="Reset",
                                  Size=Size(240, 30))
-    resetButton.Click.Add (fun _ -> events.Post Reset)
+    resetButton.Click.Add (fun _ -> dispatch Reset)
     window.Controls.Add resetButton
 
     match state.LastChoice with
@@ -137,21 +136,21 @@ let pendingPlayerGUI state =
             window.Controls.Add errorLabel
         | None              -> ()
 
-let finishedGUI state =
+let finishedGUI state dispatch =
     window.Controls.Clear ()
     let winnerLabel = new Label(Location=Point(20, 20),
                                 Text=((string state.Player) + " is the winner!"),
                                 MinimumSize=Size(300,20))
     window.Controls.Add winnerLabel
 
-    let resetButton = new Button(Location=Point(20, 50), 
+    let resetButton = new Button(Location=Point(20, 50),
                                  Text="Reset",
                                  Size=Size(240, 30))
     window.Controls.Add resetButton
-    resetButton.Click.Add (fun _ -> events.Post Reset)
+    resetButton.Click.Add (fun _ -> dispatch Reset)
 
-let nimGameGUI state =
+let nimGameGUI state dispatch =
     match state.View with
-        | InitialView                   -> startGUI state
-        | PendingPlayerView | AiView    -> pendingPlayerGUI state
-        | FinishedView                  -> finishedGUI state
+        | InitialView                   -> startGUI state dispatch
+        | PendingPlayerView | AiView    -> pendingPlayerGUI state dispatch
+        | FinishedView                  -> finishedGUI state dispatch

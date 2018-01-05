@@ -2,7 +2,6 @@ module StateStore
 
 open Heaps
 open AsyncEventQueue
-open System.Runtime.Remoting.Metadata.W3cXsd2001
 
 type Player = Player1 | Player2
 type Choice =  HeapIndex * HeapCount
@@ -34,8 +33,7 @@ type Message =
     | Undo
     | ChangeSettings of GameSettings
     | Action of Choice
-
-let events : AsyncEventQueue<Message> = AsyncEventQueue()
+type Dispatch = Message -> unit
 
 let random = System.Random ()
 
@@ -51,12 +49,12 @@ let rec randomAction (heaps : Heaps) =
     if heaps.[index] = 0
         then randomAction heaps
         else (index, (random.Next (heaps.[index] - 1) + 1))
-let aiAction state =
+let aiAction state dispatch =
     let rnd = random.NextDouble ()
     if rnd > state.Settings.AIDifficulty
         then
             let (index, count) = randomAction state.Heaps
-            events.Post (Action (index, count))
+            dispatch (Action (index, count))
         else
             let m = Seq.reduce (^^^) state.Heaps
             let (index, count) =
@@ -64,7 +62,7 @@ let aiAction state =
                     | 0 -> (maxIndex state.Heaps, 1)
                     | _ -> let k = Seq.findIndex (fun a -> (m ^^^ a) < a) state.Heaps
                            (k, state.Heaps.[k] - (m ^^^ state.Heaps.[k]))
-            events.Post (Action (index, count))
+            dispatch (Action (index, count))
 
 
 /// Swap between player one and two
@@ -121,21 +119,25 @@ let update state message : State =
                         else { state' with Player = swapPlayer state'.Player;
                                            View = PendingPlayerView; }
 
-let middleware update state message =
+let middleware dispatch update state message =
     let state' = update state message
     if state'.Settings.AIEnabled && state'.Player = Player2 && state'.View = PendingPlayerView
-        then aiAction state'; { state' with View = AiView }
+        then aiAction state' dispatch; { state' with View = AiView }
         else state'
 
+let createDispatch (events : AsyncEventQueue<Message>) : Dispatch = events.Post
+
 /// Function to start and run the game
-let start (ui : State -> unit) =
-    ui initialState
+let start (ui : State -> Dispatch -> unit) =
+    let events : AsyncEventQueue<Message> = AsyncEventQueue()
+    let dispatch = createDispatch events
+    ui initialState dispatch
     let rec run state =
         async {
             let! msg = events.Receive ()
-            let state' = middleware update state msg
+            let state' = middleware dispatch update state msg
             if state <> state' && state.Settings = state'.Settings
-                then ui state'
+                then ui state' dispatch
                 else System.Console.WriteLine ("No state changes\n" + string state + "\n" + string state'); ()
             return! run state'
         }
