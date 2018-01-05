@@ -3,6 +3,7 @@
     <ProjectGuid>a991687e-5ea8-435d-b121-cdf995dc9a42</ProjectGuid>
     <OutputType>Exe</OutputType>
     <TargetFramework>net461</TargetFramework>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="Heaps.fs" />

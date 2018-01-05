@@ -9,8 +9,8 @@ open AsyncEventQueue
 open System.Drawing
 
 let window = new Form(Text="Nim the Game",
-                        Size=Size(300, 400),
-                        BackColor=Color.LightGray)
+                      Size=Size(300, 400),
+                      BackColor=Color.LightGray)
 
 let startGUI state dispatch =
     window.Controls.Clear ()

@@ -6,9 +6,9 @@ type Either<'a, 'b> =
 
 type Error = string
 
-type Heaps = int list
 type HeapIndex = int
 type HeapCount = int
+type Heaps = HeapCount list
 
 let rnd = System.Random ()
 
